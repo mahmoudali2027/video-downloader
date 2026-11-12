@@ -1,13 +1,13 @@
-# Birlikte Al
+# Shared Basket
 
-Bir liste oluştur, bağlantıyı paylaş ve aynı alışverişi farklı telefonlardan takip et. Aynı ürün ve tercih birleştirilir. Satırın ayrıntılarında kimin ne istediği görünür.
+Create a shopping list, share its link, and check off groceries from any phone. Items with the same name and preference are grouped, with each person's request shown in the item details.
 
-## VS Code’da çalıştır
+## Run locally
 
-Node.js 22 LTS veya üzeriyle `node server.mjs` çalıştır ve `http://localhost:3000` adresini aç. Yerel veriler Windows’ta `%LOCALAPPDATA%\.birlikte-al` altında saklanır. Veri dizinini `DATA_DIR` ile belirleyebilirsin.
+Use Node.js 22 LTS or later. Run `node server.mjs` from the project directory, then open `http://localhost:3000`. On Windows, the local lists are stored under `%LOCALAPPDATA%\.birlikte-al`. Set `DATA_DIR` to use another directory.
 
-## Render
+## Deploy on Render
 
-Mevcut Docker web hizmetiyle dağıtılabilir. Birden fazla telefonun aynı listeyi açabilmesi için bağlantıyı yayınlanan siteden oluştur. Linke sahip olan herkes listeye ekleme yapabilir, istek kaldırabilir ve ürünleri işaretleyebilir.
+Use a Docker web service. Create lists on the public site to share them across devices. Anyone with a list link can add or remove requests and mark items as bought.
 
-Uygulama tek sunucu örneği için tasarlanmıştır. Render Free kullanırsan uyku, yeniden başlatma veya yeniden yayınlama sonrasında listeler kaybolabilir. Listeleri uzun süre saklamak için kalıcı bir disk bağla ve `DATA_DIR` değerini diskin bağlandığı konuma ayarla. Docker varsayılan olarak `/data` dizinine yazar.
+The app runs on a single instance. On Render Free, lists can disappear after a spin-down, restart, or redeploy. For persistent storage, mount a persistent disk and set `DATA_DIR` to its mount path. The Docker image defaults to `/data`.

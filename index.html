@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f5ec">
-  <title>Birlikte Al</title>
+  <title>Shared Basket</title>
   <style>
     :root { color-scheme: light; --paper: #f7f5ec; --ink: #26362b; --muted: #536257; --line: #d9ded2; --green: #254f38; --lime: #dcefa9; }
     * { box-sizing: border-box; }
@@ -65,16 +65,16 @@
 <body>
   <main>
     <header>
-      <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">✓</span> Birlikte Al</a>
-      <button id="share" class="secondary" aria-controls="share-url" aria-expanded="false" hidden>Linki paylaş</button>
+      <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">✓</span> Shared Basket</a>
+      <button id="share" class="secondary" aria-controls="share-url" aria-expanded="false" hidden>Share link</button>
     </header>
 
     <section id="home" class="hero">
-      <h1>Ortak alışveriş listesi</h1>
-      <p>Listeyi aç, linki gönder. Herkes istediğini eklesin, markette alınanları işaretle.</p>
+      <h1>Shared shopping list</h1>
+      <p>Create a list and share the link. Everyone can add what they need and check off items as they shop.</p>
       <form id="create-form">
-        <label>Liste adı<input name="title" maxlength="60" placeholder="Ev alışverişi" required></label>
-        <button type="submit">Liste oluştur</button>
+        <label>List name<input name="title" maxlength="60" placeholder="Weekly groceries" required></label>
+        <button type="submit">Create list</button>
       </form>
       <p id="home-message" class="feedback error" role="status"></p>
     </section>
@@ -82,32 +82,32 @@
     <section id="room" hidden>
       <div class="hero">
         <h1 id="room-name"></h1>
-        <p class="room-intro">Linki alan herkes bu listeye ürün ekleyebilir.</p>
-        <input id="share-url" aria-label="Alışveriş listesi bağlantısı" readonly hidden>
+        <p class="room-intro">Anyone with the link can add items to this list.</p>
+        <input id="share-url" aria-label="Shopping list link" readonly hidden>
         <p id="share-message" class="feedback" role="status"></p>
       </div>
       <div class="workspace">
         <section class="panel">
-          <h2>İstek ekle</h2>
+          <h2>Add an item</h2>
           <form id="item-form">
-            <label>Adın<input name="person" maxlength="32" required autocomplete="given-name"></label>
+            <label>Your name<input name="person" maxlength="32" required autocomplete="given-name"></label>
             <div class="fields">
-              <label>Ürün<input name="product" maxlength="60" placeholder="Süt" required></label>
-              <label>Adet<input name="quantity" type="number" min="1" max="99" value="1" required inputmode="numeric"></label>
+              <label>Item<input name="product" maxlength="60" placeholder="Milk" required></label>
+              <label>Qty<input name="quantity" type="number" min="1" max="99" value="1" required inputmode="numeric"></label>
             </div>
-            <label>Tercih <input name="preference" maxlength="60" placeholder="İsteğe bağlı, örn. laktozsuz"></label>
-            <button type="submit">Listeye ekle</button>
+            <label>Preference <input name="preference" maxlength="60" placeholder="Optional, e.g. lactose-free"></label>
+            <button type="submit">Add to list</button>
           </form>
           <p id="form-message" class="feedback" role="status"></p>
         </section>
         <section class="panel">
           <div class="section-title">
-            <h2>Alışveriş listesi</h2>
+            <h2>Shopping list</h2>
             <p id="summary"></p>
           </div>
-          <div class="tabs" aria-label="Liste filtresi">
-            <button id="remaining" type="button" aria-pressed="true">Kalanlar</button>
-            <button id="all" type="button" aria-pressed="false">Tümü</button>
+          <div class="tabs" aria-label="List filter">
+            <button id="remaining" type="button" aria-pressed="true">To buy</button>
+            <button id="all" type="button" aria-pressed="false">All items</button>
           </div>
           <p id="list-message" class="feedback error" role="status"></p>
           <div id="items"></div>
@@ -116,7 +116,8 @@
     </section>
   </main>
   <script>
-    const roomId = new URLSearchParams(location.search).get('liste');
+    const params = new URLSearchParams(location.search);
+    const roomId = params.get('list') ?? params.get('liste');
     const roomPath = '/api/lists/' + encodeURIComponent(roomId ?? '');
     const home = document.querySelector('#home');
     const room = document.querySelector('#room');
@@ -155,7 +156,7 @@
       const groups = new Map();
       for (const item of items) {
         const key = JSON.stringify([item.product, item.preference].map((text) =>
-          text.normalize('NFC').toLocaleLowerCase('tr')));
+          text.normalize('NFC').toLowerCase().replace(/i\u0307/g, 'i')));
         if (!groups.has(key)) groups.set(key, { key, product: item.product, preference: item.preference, items: [] });
         groups.get(key).items.push(item);
       }
@@ -176,13 +177,13 @@
       const openDetails = new Set([...itemsContainer.querySelectorAll('details[open]')].map((node) => node.dataset.key));
       const groups = groupItems(currentList.items);
       const remaining = groups.filter((group) => group.items.some((item) => !item.bought));
-      document.querySelector('#summary').textContent = remaining.length + ' ürün kaldı';
+      document.querySelector('#summary').textContent = remaining.length + (remaining.length === 1 ? ' item left' : ' items left');
       remainingButton.setAttribute('aria-pressed', String(!showAll));
       allButton.setAttribute('aria-pressed', String(showAll));
       const visible = showAll ? groups : remaining;
       itemsContainer.replaceChildren(...visible.map((group) => itemRow(group, openDetails)));
       if (!visible.length) {
-        itemsContainer.append(element('p', groups.length ? 'Her şey alındı.' : 'Liste boş. İlk ürünü ekle.'));
+        itemsContainer.append(element('p', groups.length ? 'Everything has been bought.' : 'Your list is empty. Add the first item.'));
       }
     }
 
@@ -195,7 +196,7 @@
       const quantity = shownItems.reduce((sum, item) => sum + item.quantity, 0);
       label.append(element('strong', quantity + ' × ' + group.product));
       if (group.preference) label.append(element('small', group.preference));
-      const action = element('button', pending.length ? 'Alındı' : 'Geri al', 'secondary');
+      const action = element('button', pending.length ? 'Mark bought' : 'Undo', 'secondary');
       action.type = 'button';
       action.setAttribute('aria-label', action.textContent + ' · ' + group.product + (group.preference ? ', ' + group.preference : ''));
       action.addEventListener('click', () => change(action, listMessage, '/bought', 'PATCH', {
@@ -207,14 +208,14 @@
       const details = element('details');
       details.dataset.key = group.key;
       details.open = openDetails.has(group.key);
-      details.append(element('summary', 'Kim ne istedi?'));
+      details.append(element('summary', 'Who requested this?'));
       const names = element('ul', '', 'details');
       for (const item of shownItems) {
         const entry = element('li');
-        entry.append(element('span', item.person + ' · ' + item.quantity + ' adet' + (item.bought ? ' · alındı' : '')));
-        const remove = element('button', 'Kaldır');
+        entry.append(element('span', item.person + ' · ' + item.quantity + (item.bought ? ' · bought' : '')));
+        const remove = element('button', 'Remove');
         remove.type = 'button';
-        remove.setAttribute('aria-label', item.person + ' adlı kişinin isteğini kaldır');
+        remove.setAttribute('aria-label', 'Remove request from ' + item.person);
         remove.addEventListener('click', () => change(remove, listMessage, '/items/' + item.id, 'DELETE'));
         entry.append(remove);
         names.append(entry);
@@ -271,7 +272,7 @@
       feedback.textContent = '';
       try {
         const list = await api('/api/lists', 'POST', { title: new FormData(form).get('title') });
-        location.search = new URLSearchParams({ liste: list.id }).toString();
+        location.search = new URLSearchParams({ list: list.id }).toString();
       } catch (error) {
         feedback.textContent = error.message;
         button.disabled = false;
@@ -287,7 +288,7 @@
         itemForm.elements.product.value = '';
         itemForm.elements.preference.value = '';
         itemForm.elements.quantity.value = '1';
-        message.textContent = 'İstek eklendi.';
+        message.textContent = 'Item added.';
       }
     });
 
@@ -298,21 +299,21 @@
       const input = document.querySelector('#share-url');
       const message = document.querySelector('#share-message');
       const link = new URL('/', location.origin);
-      link.searchParams.set('liste', currentList.id);
+      link.searchParams.set('list', currentList.id);
       input.value = link.href;
       input.hidden = false;
       share.setAttribute('aria-expanded', 'true');
       const localNote = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
-        ? ' Bu bağlantı yalnızca bu bilgisayarda açılır.'
+        ? ' This link only works on this computer.'
         : '';
-      message.textContent = 'Liste linki hazır.' + localNote;
+      message.textContent = 'Your link is ready.' + localNote;
       try {
         await navigator.clipboard.writeText(input.value);
-        message.textContent = 'Liste linki kopyalandı.' + localNote;
+        message.textContent = 'Link copied.' + localNote;
       } catch {
         input.focus();
         input.select();
-        message.textContent = 'Bağlantıyı kutudan kopyalayabilirsin.' + localNote;
+        message.textContent = 'Copy the link from the field above.' + localNote;
       }
     });
 
