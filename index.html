@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video İndirici</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font: 16px/1.55 'DM Sans', system-ui, sans-serif; color: #f6f3ff; background: radial-gradient(ellipse at top, #2b1b47, #11101a 58%); }
+    main { width: min(100%, 590px); padding: clamp(24px, 6vw, 54px); background: #1a1726; border: 1px solid #3b314f; border-radius: 24px; box-shadow: 0 24px 80px #09061088; }
+    h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.12; letter-spacing: -.045em; margin: 0 0 14px; }
+    p { color: #c6bbd6; margin: 0 0 26px; }
+    label { display: block; margin-bottom: 7px; font-weight: 650; }
+    input, button { font: inherit; border-radius: 10px; width: 100%; padding: 13px 15px; }
+    input { border: 1px solid #5c5073; color: #fff; background: #15121f; }
+    input::placeholder { color: #a297b4; }
+    button { border: 0; background: #cbb2ff; color: #241238; margin-top: 12px; font-weight: 750; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    :focus-visible { outline: 3px solid #ddc9ff; outline-offset: 3px; }
+    #status { margin: 14px 0 0; min-height: 1.55em; }
+    small { color: #c6bbd6; display: block; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Video İndirici</h1>
+    <p>İndirme iznin olan bir YouTube videosunu MP4 olarak kaydet.</p>
+    <form action="/download" method="get">
+      <label for="video">YouTube bağlantısı</label>
+      <input id="video" name="video" type="url" placeholder="https://www.youtube.com/watch?v=…" required maxlength="2048" aria-describedby="limits">
+      <button type="submit">MP4 indir</button>
+    </form>
+    <div id="status" role="status"></div>
+    <small id="limits">Video sınırı 20 dakika ve 100 MB.</small>
+  </main>
+  <script>
+    const form = document.querySelector('form');
+    const button = form.querySelector('button');
+    const status = document.querySelector('#status');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      status.textContent = 'Video hazırlanıyor…';
+      try {
+        const query = new URLSearchParams(new FormData(form));
+        const result = await fetch(`/download?${query}`);
+        if (!result.ok) {
+          status.textContent = await result.text();
+          return;
+        }
+        const file = URL.createObjectURL(await result.blob());
+        const link = document.createElement('a');
+        link.href = file;
+        link.download = result.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'video.mp4';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(file), 60_000);
+        status.textContent = 'Video tarayıcının indirmelerine gönderildi.';
+      } catch {
+        status.textContent = 'Bağlantı kesildi. Tekrar dene.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
