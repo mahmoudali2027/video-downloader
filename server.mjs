@@ -35,13 +35,24 @@ function download(id, directory, signal) {
       '--match-filter', '!is_live & duration <= 1200', '--max-filesize', '100M',
       '-f', 'b[ext=mp4][height<=720]', '-o', join(directory, 'video.mp4'),
       `https://www.youtube.com/watch?v=${id}`,
-    ], { stdio: 'ignore', windowsHide: true, signal });
+    ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true, signal });
     let failure;
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-4096); });
     child.once('error', (error) => { failure = error; });
     child.once('close', (code) => {
       if (failure) reject(failure);
       else if (code === 0) resolve();
-      else reject(new Error(`yt-dlp exit code ${code}`));
+      else {
+        const error = new Error(`yt-dlp exit code ${code}: ${stderr.trim()}`);
+        if (/sign in to confirm you.re not a bot/i.test(stderr)) {
+          error.code = 'YOUTUBE_SERVER_BLOCKED';
+        } else if (/requested format is not available|no video formats found/i.test(stderr)) {
+          error.code = 'YOUTUBE_FORMAT_UNAVAILABLE';
+        }
+        reject(error);
+      }
     });
   });
 }
@@ -94,8 +105,16 @@ createServer(async (request, response) => {
     });
     await pipeline(createReadStream(file), response, { signal: cancel.signal });
   } catch (error) {
-    console.error(error.code ?? error.message);
+    console.error(error.message);
     if (!response.headersSent && !response.destroyed) {
+      if (error.code === 'YOUTUBE_SERVER_BLOCKED') {
+        sendError(response, 503, 'YouTube bu sunucudan video indirmeye izin vermiyor.');
+        return;
+      }
+      if (error.code === 'YOUTUBE_FORMAT_UNAVAILABLE') {
+        sendError(response, 422, 'Bu video indirilebilir MP4 biçiminde bulunamadı.');
+        return;
+      }
       const message = error.code === 'ENOENT' && error.syscall?.startsWith('spawn')
         ? 'Sunucuda yt-dlp kurulu değil.'
         : 'Video hazırlanamadı. Bağlantıyı ve video sınırlarını kontrol et.';
