@@ -1,131 +1,130 @@
-import { spawn } from 'node:child_process';
-import { createReadStream } from 'node:fs';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { pipeline } from 'node:stream/promises';
 
-const page = await readFile(new URL('./index.html', import.meta.url));
-const idPattern = /^[A-Za-z0-9_-]{11}$/;
-let activeDownloads = 0;
+const page = readFileSync(new URL('./index.html', import.meta.url));
+const dataDir = process.env.DATA_DIR || join(process.env.LOCALAPPDATA || homedir(), '.birlikte-al');
+const listRoute = /^\/api\/lists\/([a-f0-9-]{36})(?:\/(items|bought)(?:\/([a-f0-9-]{36}))?)?$/;
+mkdirSync(dataDir, { recursive: true });
 
-function videoId(value) {
-  const url = URL.parse(value ?? '');
-  if (!url || url.protocol !== 'https:') return null;
-  const parts = url.pathname.split('/');
-  let id;
-  if (url.hostname === 'youtu.be') id = parts[1];
-  if (['www.youtube.com', 'youtube.com', 'm.youtube.com'].includes(url.hostname)) {
-    if (url.pathname === '/watch') id = url.searchParams.get('v');
-    if (['shorts', 'live'].includes(parts[1])) id = parts[2];
-  }
-  return idPattern.test(id ?? '') ? id : null;
+function send(response, status, value) {
+  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify(value));
 }
 
-function sendError(response, status, message) {
-  response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-  response.end(message);
-}
+class InputError extends Error {}
 
-function download(id, directory, signal) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('yt-dlp', [
-      '--ignore-config', '--no-playlist', '--no-progress', '--socket-timeout', '15',
-      '--match-filter', '!is_live & duration <= 1200', '--max-filesize', '100M',
-      '-f', 'b[ext=mp4][height<=720]', '-o', join(directory, 'video.mp4'),
-      `https://www.youtube.com/watch?v=${id}`,
-    ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true, signal });
-    let failure;
-    let stderr = '';
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-4096); });
-    child.once('error', (error) => { failure = error; });
-    child.once('close', (code) => {
-      if (failure) reject(failure);
-      else if (code === 0) resolve();
-      else {
-        const error = new Error(`yt-dlp exit code ${code}: ${stderr.trim()}`);
-        if (/sign in to confirm you.re not a bot/i.test(stderr)) {
-          error.code = 'YOUTUBE_SERVER_BLOCKED';
-        } else if (/requested format is not available|no video formats found/i.test(stderr)) {
-          error.code = 'YOUTUBE_FORMAT_UNAVAILABLE';
-        }
-        reject(error);
-      }
-    });
-  });
-}
-
-createServer(async (request, response) => {
-  const url = URL.parse(request.url, 'http://localhost');
-  response.setHeader('Cache-Control', 'no-store');
-  if (!url) {
-    sendError(response, 400, 'Geçersiz istek.');
-    return;
+async function body(request) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 8192) throw new InputError('Gönderilen bilgi çok uzun.');
+    chunks.push(chunk);
   }
-  if (request.method === 'GET' && url.pathname === '/') {
-    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    response.end(page);
-    return;
-  }
-  if (request.method !== 'GET' || url.pathname !== '/download') {
-    sendError(response, 404, 'Sayfa bulunamadı.');
-    return;
-  }
-  const id = videoId(url.searchParams.get('video'));
-  if (!id) {
-    sendError(response, 400, 'Geçerli bir YouTube video bağlantısı gir.');
-    return;
-  }
-  if (activeDownloads >= 2) {
-    sendError(response, 503, 'İndirme kapasitesi dolu. Biraz sonra tekrar dene.');
-    return;
-  }
-
-  activeDownloads += 1;
-  const cancel = new AbortController();
-  const stop = () => cancel.abort();
-  const timeout = setTimeout(stop, 120_000);
-  const stopOnDisconnect = () => {
-    if (!response.writableFinished) stop();
-  };
-  response.once('close', stopOnDisconnect);
-  let directory;
+  let value;
   try {
-    directory = await mkdtemp(join(tmpdir(), 'video-indirici-'));
-    await download(id, directory, cancel.signal);
-    const file = join(directory, 'video.mp4');
-    const { size } = await stat(file);
-    if (!size || size > 100 * 1024 * 1024) throw new Error('Unexpected file size');
-    response.writeHead(200, {
-      'Content-Type': 'video/mp4',
-      'Content-Length': size,
-      'Content-Disposition': `attachment; filename="${id}.mp4"`,
-    });
-    await pipeline(createReadStream(file), response, { signal: cancel.signal });
-  } catch (error) {
-    console.error(error.message);
-    if (!response.headersSent && !response.destroyed) {
-      if (error.code === 'YOUTUBE_SERVER_BLOCKED') {
-        sendError(response, 503, 'YouTube bu sunucudan video indirmeye izin vermiyor.');
-        return;
-      }
-      if (error.code === 'YOUTUBE_FORMAT_UNAVAILABLE') {
-        sendError(response, 422, 'Bu video indirilebilir MP4 biçiminde bulunamadı.');
-        return;
-      }
-      const message = error.code === 'ENOENT' && error.syscall?.startsWith('spawn')
-        ? 'Sunucuda yt-dlp kurulu değil.'
-        : 'Video hazırlanamadı. Bağlantıyı ve video sınırlarını kontrol et.';
-      sendError(response, 502, message);
-    }
-  } finally {
-    clearTimeout(timeout);
-    response.off('close', stopOnDisconnect);
-    if (directory) await rm(directory, { recursive: true, force: true }).catch(console.error);
-    activeDownloads -= 1;
+    value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw new InputError('Gönderilen bilgi okunamadı.');
   }
-}).listen(Number(process.env.PORT ?? 3000), process.env.BIND_HOST ?? '127.0.0.1', () => {
-  console.log(`Video İndirici hazır. Yerel adres: http://localhost:${process.env.PORT ?? 3000}`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InputError('Gönderilen bilgi okunamadı.');
+  }
+  return value;
+}
+
+function field(value, label, max, required = true) {
+  if (typeof value !== 'string') throw new InputError(label + ' geçersiz.');
+  const cleaned = value.trim().replace(/\s+/g, ' ');
+  if ((required && !cleaned) || cleaned.length > max) {
+    throw new InputError(label + ' en fazla ' + max + ' karakter olabilir.');
+  }
+  return cleaned;
+}
+
+function save(list) {
+  const path = join(dataDir, list.id + '.json');
+  writeFileSync(path + '.tmp', JSON.stringify(list), { mode: 0o600 });
+  renameSync(path + '.tmp', path);
+}
+
+function load(id) {
+  const path = join(dataDir, id + '.json');
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+}
+
+function update(list, action, itemId, method, data) {
+  if (action === 'items' && method === 'POST' && !itemId) {
+    if (list.items.length >= 150) throw new InputError('Bu listede en fazla 150 istek olabilir.');
+    if (!Number.isInteger(data.quantity) || data.quantity < 1 || data.quantity > 99) {
+      throw new InputError('Miktar 1 ile 99 arasında bir tam sayı olmalı.');
+    }
+    list.items.push({
+      id: randomUUID(),
+      person: field(data.person, 'İsim', 32),
+      product: field(data.product, 'Ürün adı', 60),
+      quantity: data.quantity,
+      preference: field(data.preference ?? '', 'Tercih', 60, false),
+      bought: false,
+    });
+    return true;
+  }
+  if (action === 'items' && method === 'DELETE' && itemId) {
+    list.items = list.items.filter((item) => item.id !== itemId);
+    return true;
+  }
+  if (action === 'bought' && method === 'PATCH' && !itemId) {
+    if (!Array.isArray(data.ids) || data.ids.length > 150 || typeof data.bought !== 'boolean') {
+      throw new InputError('Ürün seçimi geçersiz.');
+    }
+    const ids = new Set(data.ids);
+    for (const item of list.items) {
+      if (ids.has(item.id)) item.bought = data.bought;
+    }
+    return true;
+  }
+  return false;
+}
+
+const port = Number(process.env.PORT ?? 3000);
+createServer(async (request, response) => {
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  const url = URL.parse(request.url, 'http://localhost');
+  const method = request.method;
+  if (!url) return send(response, 400, { error: 'Geçersiz istek.' });
+  if (method === 'GET' && url.pathname === '/') {
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return response.end(page);
+  }
+  try {
+    if (method === 'POST' && url.pathname === '/api/lists') {
+      const data = await body(request);
+      const list = { id: randomUUID(), title: field(data.title, 'Liste adı', 60), items: [] };
+      save(list);
+      return send(response, 201, list);
+    }
+    const route = listRoute.exec(url.pathname);
+    if (!route) return send(response, 404, { error: 'Sayfa bulunamadı.' });
+    const [, id, action, itemId] = route;
+    // Read the body before loading so concurrent requests cannot overwrite newer changes.
+    const data = ['POST', 'PATCH'].includes(method) ? await body(request) : {};
+    const list = load(id);
+    if (!list) return send(response, 404, { error: 'Bu alışveriş listesi bulunamadı.' });
+    if (method === 'GET' && !action) return send(response, 200, list);
+    if (!update(list, action, itemId, method, data)) {
+      return send(response, 405, { error: 'Bu işlem desteklenmiyor.' });
+    }
+    save(list);
+    return send(response, 200, list);
+  } catch (error) {
+    if (error instanceof InputError) return send(response, 400, { error: error.message });
+    console.error(error);
+    return send(response, 500, { error: 'Liste kaydedilemedi. Tekrar dene.' });
+  }
+}).listen(port, process.env.BIND_HOST ?? '127.0.0.1', () => {
+  console.log('Birlikte Al hazır. http://localhost:' + port);
 });

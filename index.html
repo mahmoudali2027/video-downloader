@@ -3,66 +3,324 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Video İndirici</title>
+  <meta name="theme-color" content="#f7f5ec">
+  <title>Birlikte Al</title>
   <style>
+    :root { color-scheme: light; --paper: #f7f5ec; --ink: #26362b; --muted: #536257; --line: #d9ded2; --green: #254f38; --lime: #dcefa9; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font: 16px/1.55 'DM Sans', system-ui, sans-serif; color: #f6f3ff; background: radial-gradient(ellipse at top, #2b1b47, #11101a 58%); }
-    main { width: min(100%, 590px); padding: clamp(24px, 6vw, 54px); background: #1a1726; border: 1px solid #3b314f; border-radius: 24px; box-shadow: 0 24px 80px #09061088; }
-    h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.12; letter-spacing: -.045em; margin: 0 0 14px; }
-    p { color: #c6bbd6; margin: 0 0 26px; }
-    label { display: block; margin-bottom: 7px; font-weight: 650; }
-    input, button { font: inherit; border-radius: 10px; width: 100%; padding: 13px 15px; }
-    input { border: 1px solid #5c5073; color: #fff; background: #15121f; }
-    input::placeholder { color: #a297b4; }
-    button { border: 0; background: #cbb2ff; color: #241238; margin-top: 12px; font-weight: 750; cursor: pointer; }
-    button:disabled { opacity: .65; cursor: wait; }
-    :focus-visible { outline: 3px solid #ddc9ff; outline-offset: 3px; }
-    #status { margin: 14px 0 0; min-height: 1.55em; }
-    small { color: #c6bbd6; display: block; margin-top: 18px; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 'DM Sans', system-ui, sans-serif; }
+    main { width: min(100% - 32px, 860px); margin: auto; padding: 26px 0 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+    a { color: var(--green); }
+    .brand { font-weight: 850; font-size: 21px; text-decoration: none; letter-spacing: -.04em; }
+    .brand-icon { display: inline-grid; place-items: center; width: 33px; height: 33px; margin-right: 6px; border-radius: 10px; background: var(--lime); }
+    h1, h2, p { margin: 0; overflow-wrap: anywhere; }
+    h1 { font: 700 clamp(34px, 7vw, 63px)/1.05 'DM Sans', system-ui, sans-serif; letter-spacing: -.065em; }
+    h2 { font-size: 20px; line-height: 1.25; letter-spacing: -.025em; }
+    p { color: var(--muted); }
+    .hero, .panel { border-radius: 22px; padding: clamp(20px, 5vw, 42px); }
+    .hero { background: var(--green); color: #fff; }
+    .hero p { color: #e0ebdc; margin-top: 12px; max-width: 48ch; }
+    .hero form { margin-top: 30px; }
+    .hero button { color: var(--green); background: var(--lime); }
+    .panel { background: #fff; border: 1px solid var(--line); }
+    .workspace { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; margin-top: 16px; align-items: start; }
+    .workspace .panel { padding: 22px; }
+    form { display: grid; gap: 14px; }
+    #item-form { margin-top: 15px; }
+    .fields { display: grid; grid-template-columns: 1fr 88px; gap: 12px; }
+    label { display: grid; gap: 5px; font-weight: 650; }
+    input, button { font: inherit; min-height: 44px; border-radius: 10px; padding: 10px 13px; }
+    input { width: 100%; border: 1px solid #a8b3a5; color: var(--ink); background: #fff; }
+    button { background: var(--green); color: #fff; border: 1px solid transparent; cursor: pointer; font-weight: 700; }
+    button:disabled { opacity: .6; cursor: wait; }
+    button.secondary { color: var(--green); border-color: var(--line); background: #fff; }
+    button:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid #78934d; outline-offset: 3px; }
+    .section-title { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+    #summary { font-size: 13px; text-align: right; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+    .tabs button { background: #eef2e7; color: var(--green); padding: 6px 12px; }
+    .tabs button[aria-pressed="true"] { background: var(--lime); border-color: #b5cd79; }
+    .item { border-top: 1px solid var(--line); padding: 9px 0; }
+    .item-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item-title { min-width: 0; }
+    .item-title strong { display: block; overflow-wrap: anywhere; }
+    .item-title small, .details { color: var(--muted); overflow-wrap: anywhere; }
+    details { margin-top: 3px; }
+    summary { cursor: pointer; color: var(--green); padding: 6px 0; font-size: 14px; }
+    .details { list-style: none; margin: 0; padding: 0; }
+    .details li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+    .details button { font-size: 13px; color: #812d2b; background: transparent; padding: 5px 0 5px 7px; }
+    .feedback { margin: 10px 0 0; font-size: 14px; }
+    .hero .feedback { margin: 8px 0 0; }
+    .feedback:empty { display: none; }
+    .error { color: #812d2b; }
+    .hero .error { color: #ffe2b7; }
+    .room-intro { margin: 4px 0 0; }
+    #share-url { margin-top: 10px; }
+    @media (max-width: 640px) { .workspace { grid-template-columns: 1fr; } main { padding-top: 16px; } header { margin-bottom: 16px; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>Video İndirici</h1>
-    <p>İndirme iznin olan bir YouTube videosunu MP4 olarak kaydet.</p>
-    <form action="/download" method="get">
-      <label for="video">YouTube bağlantısı</label>
-      <input id="video" name="video" type="url" placeholder="https://www.youtube.com/watch?v=…" required maxlength="2048" aria-describedby="limits">
-      <button type="submit">MP4 indir</button>
-    </form>
-    <div id="status" role="status"></div>
-    <small id="limits">Video sınırı 20 dakika ve 100 MB.</small>
+    <header>
+      <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">✓</span> Birlikte Al</a>
+      <button id="share" class="secondary" hidden>Linki paylaş</button>
+    </header>
+
+    <section id="home" class="hero">
+      <h1>Ortak alışveriş listesi</h1>
+      <p>Listeyi aç, linki gönder. Herkes istediğini eklesin, markette alınanları işaretle.</p>
+      <form id="create-form">
+        <label>Liste adı<input name="title" maxlength="60" placeholder="Ev alışverişi" required></label>
+        <button type="submit">Liste oluştur</button>
+      </form>
+      <p id="home-message" class="feedback error" role="status"></p>
+    </section>
+
+    <section id="room" hidden>
+      <div class="hero">
+        <h1 id="room-name"></h1>
+        <p class="room-intro">Linki alan herkes bu listeye ürün ekleyebilir.</p>
+        <input id="share-url" aria-label="Alışveriş listesi bağlantısı" readonly hidden>
+        <p id="share-message" class="feedback" role="status"></p>
+      </div>
+      <div class="workspace">
+        <section class="panel">
+          <h2>İstek ekle</h2>
+          <form id="item-form">
+            <label>Adın<input name="person" maxlength="32" required autocomplete="given-name"></label>
+            <div class="fields">
+              <label>Ürün<input name="product" maxlength="60" placeholder="Süt" required></label>
+              <label>Adet<input name="quantity" type="number" min="1" max="99" value="1" required inputmode="numeric"></label>
+            </div>
+            <label>Tercih <input name="preference" maxlength="60" placeholder="İsteğe bağlı, örn. laktozsuz"></label>
+            <button type="submit">Listeye ekle</button>
+          </form>
+          <p id="form-message" class="feedback" role="status"></p>
+        </section>
+        <section class="panel">
+          <div class="section-title">
+            <h2>Alışveriş listesi</h2>
+            <p id="summary"></p>
+          </div>
+          <div class="tabs" aria-label="Liste filtresi">
+            <button id="remaining" type="button" aria-pressed="true">Kalanlar</button>
+            <button id="all" type="button" aria-pressed="false">Tümü</button>
+          </div>
+          <p id="list-message" class="feedback error" role="status"></p>
+          <div id="items"></div>
+        </section>
+      </div>
+    </section>
   </main>
   <script>
-    const form = document.querySelector('form');
-    const button = form.querySelector('button');
-    const status = document.querySelector('#status');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
+    const roomId = new URLSearchParams(location.search).get('liste');
+    const roomPath = '/api/lists/' + encodeURIComponent(roomId ?? '');
+    const home = document.querySelector('#home');
+    const room = document.querySelector('#room');
+    const share = document.querySelector('#share');
+    const listMessage = document.querySelector('#list-message');
+    const itemForm = document.querySelector('#item-form');
+    const remainingButton = document.querySelector('#remaining');
+    const allButton = document.querySelector('#all');
+    const itemsContainer = document.querySelector('#items');
+    let currentList;
+    let showAll = false;
+    let changing = false;
+    let changeVersion = 0;
+    let pollPending = false;
+
+    async function api(path, method = 'GET', data) {
+      const options = { method, cache: 'no-store' };
+      if (data) {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(data);
+      }
+      const response = await fetch(path, options);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      return result;
+    }
+
+    function element(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function groupItems(items) {
+      const groups = new Map();
+      for (const item of items) {
+        const key = JSON.stringify([item.product, item.preference].map((text) =>
+          text.normalize('NFC').toLocaleLowerCase('tr')));
+        if (!groups.has(key)) groups.set(key, { key, product: item.product, preference: item.preference, items: [] });
+        groups.get(key).items.push(item);
+      }
+      return [...groups.values()];
+    }
+
+    function render(list) {
+      const unchanged = currentList && JSON.stringify(currentList.items) === JSON.stringify(list.items);
+      currentList = list;
+      home.hidden = true;
+      room.hidden = false;
+      share.hidden = false;
+      document.querySelector('#room-name').textContent = list.title;
+      if (!unchanged) renderItems();
+    }
+
+    function renderItems() {
+      const openDetails = new Set([...itemsContainer.querySelectorAll('details[open]')].map((node) => node.dataset.key));
+      const groups = groupItems(currentList.items);
+      const remaining = groups.filter((group) => group.items.some((item) => !item.bought));
+      document.querySelector('#summary').textContent = remaining.length + ' ürün kaldı';
+      remainingButton.setAttribute('aria-pressed', String(!showAll));
+      allButton.setAttribute('aria-pressed', String(showAll));
+      const visible = showAll ? groups : remaining;
+      itemsContainer.replaceChildren(...visible.map((group) => itemRow(group, openDetails)));
+      if (!visible.length) {
+        itemsContainer.append(element('p', groups.length ? 'Her şey alındı.' : 'Liste boş. İlk ürünü ekle.'));
+      }
+    }
+
+    function itemRow(group, openDetails) {
+      const row = element('article', '', 'item');
+      const titleRow = element('div', '', 'item-heading');
+      const label = element('div', '', 'item-title');
+      const pending = group.items.filter((item) => !item.bought);
+      const shownItems = showAll ? group.items : pending;
+      const quantity = shownItems.reduce((sum, item) => sum + item.quantity, 0);
+      label.append(element('strong', quantity + ' × ' + group.product));
+      if (group.preference) label.append(element('small', group.preference));
+      const action = element('button', pending.length ? 'Alındı' : 'Geri al', 'secondary');
+      action.type = 'button';
+      action.setAttribute('aria-label', action.textContent + ' · ' + group.product + (group.preference ? ', ' + group.preference : ''));
+      action.addEventListener('click', () => change(action, listMessage, '/bought', 'PATCH', {
+        ids: (pending.length ? pending : group.items).map((item) => item.id),
+        bought: pending.length > 0,
+      }));
+      titleRow.append(label, action);
+
+      const details = element('details');
+      details.dataset.key = group.key;
+      details.open = openDetails.has(group.key);
+      details.append(element('summary', 'Kim ne istedi?'));
+      const names = element('ul', '', 'details');
+      for (const item of shownItems) {
+        const entry = element('li');
+        entry.append(element('span', item.person + ' · ' + item.quantity + ' adet' + (item.bought ? ' · alındı' : '')));
+        const remove = element('button', 'Kaldır');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', item.person + ' adlı kişinin isteğini kaldır');
+        remove.addEventListener('click', () => change(remove, listMessage, '/items/' + item.id, 'DELETE'));
+        entry.append(remove);
+        names.append(entry);
+      }
+      details.append(names);
+      row.append(titleRow, details);
+      return row;
+    }
+
+    async function change(button, message, suffix, method, data) {
+      if (changing) return false;
+      changing = true;
+      changeVersion += 1;
       button.disabled = true;
-      status.textContent = 'Video hazırlanıyor…';
+      message.textContent = '';
+      message.classList.remove('error');
       try {
-        const query = new URLSearchParams(new FormData(form));
-        const result = await fetch(`/download?${query}`);
-        if (!result.ok) {
-          status.textContent = await result.text();
-          return;
-        }
-        const file = URL.createObjectURL(await result.blob());
-        const link = document.createElement('a');
-        link.href = file;
-        link.download = result.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'video.mp4';
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(file), 60_000);
-        status.textContent = 'Video tarayıcının indirmelerine gönderildi.';
-      } catch {
-        status.textContent = 'Bağlantı kesildi. Tekrar dene.';
+        render(await api(roomPath + suffix, method, data));
+        return true;
+      } catch (error) {
+        message.classList.add('error');
+        message.textContent = error.message;
+        return false;
       } finally {
+        button.disabled = false;
+        changing = false;
+        changeVersion += 1;
+      }
+    }
+
+    async function refresh() {
+      if (changing || pollPending) return;
+      pollPending = true;
+      const version = changeVersion;
+      try {
+        const list = await api(roomPath);
+        if (version === changeVersion) render(list);
+      } catch (error) {
+        if (!currentList) {
+          home.hidden = false;
+          document.querySelector('#home-message').textContent = error.message;
+        }
+      } finally {
+        pollPending = false;
+      }
+    }
+
+    document.querySelector('#create-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      const feedback = document.querySelector('#home-message');
+      button.disabled = true;
+      feedback.textContent = '';
+      try {
+        const list = await api('/api/lists', 'POST', { title: new FormData(form).get('title') });
+        location.search = new URLSearchParams({ liste: list.id }).toString();
+      } catch (error) {
+        feedback.textContent = error.message;
         button.disabled = false;
       }
     });
+
+    itemForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(itemForm));
+      data.quantity = Number(data.quantity);
+      const message = document.querySelector('#form-message');
+      if (await change(itemForm.querySelector('button'), message, '/items', 'POST', data)) {
+        itemForm.elements.product.value = '';
+        itemForm.elements.preference.value = '';
+        itemForm.elements.quantity.value = '1';
+        message.textContent = 'İstek eklendi.';
+      }
+    });
+
+    remainingButton.addEventListener('click', () => { showAll = false; renderItems(); });
+    allButton.addEventListener('click', () => { showAll = true; renderItems(); });
+
+    share.addEventListener('click', async () => {
+      const message = document.querySelector('#share-message');
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: currentList.title, url: location.href });
+          return;
+        } catch (error) {
+          if (error.name === 'AbortError') return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(location.href);
+        message.textContent = 'Liste linki kopyalandı.';
+      } catch {
+        const input = document.querySelector('#share-url');
+        input.hidden = false;
+        input.value = location.href;
+        input.select();
+        message.textContent = 'Bu bağlantıyı kopyalayıp paylaş.';
+      }
+    });
+
+    if (roomId) {
+      refresh();
+      setInterval(() => { if (!document.hidden) refresh(); }, 3500);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    }
   </script>
 </body>
 </html>
