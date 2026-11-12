@@ -66,7 +66,7 @@
   <main>
     <header>
       <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">✓</span> Birlikte Al</a>
-      <button id="share" class="secondary" hidden>Linki paylaş</button>
+      <button id="share" class="secondary" aria-controls="share-url" aria-expanded="false" hidden>Linki paylaş</button>
     </header>
 
     <section id="home" class="hero">
@@ -295,24 +295,24 @@
     allButton.addEventListener('click', () => { showAll = true; renderItems(); });
 
     share.addEventListener('click', async () => {
+      const input = document.querySelector('#share-url');
       const message = document.querySelector('#share-message');
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: currentList.title, url: location.href });
-          return;
-        } catch (error) {
-          if (error.name === 'AbortError') return;
-        }
-      }
+      const link = new URL('/', location.origin);
+      link.searchParams.set('liste', currentList.id);
+      input.value = link.href;
+      input.hidden = false;
+      share.setAttribute('aria-expanded', 'true');
+      const localNote = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+        ? ' Bu bağlantı yalnızca bu bilgisayarda açılır.'
+        : '';
+      message.textContent = 'Liste linki hazır.' + localNote;
       try {
-        await navigator.clipboard.writeText(location.href);
-        message.textContent = 'Liste linki kopyalandı.';
+        await navigator.clipboard.writeText(input.value);
+        message.textContent = 'Liste linki kopyalandı.' + localNote;
       } catch {
-        const input = document.querySelector('#share-url');
-        input.hidden = false;
-        input.value = location.href;
+        input.focus();
         input.select();
-        message.textContent = 'Bu bağlantıyı kopyalayıp paylaş.';
+        message.textContent = 'Bağlantıyı kutudan kopyalayabilirsin.' + localNote;
       }
     });
 
